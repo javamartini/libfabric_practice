@@ -1,5 +1,5 @@
-#ifndef NET_H
-#define NET_H
+#ifndef NET_HPP
+#define NET_HPP
 
 /* Libfabric libraries. */
 #include <rdma/fabric.h>
@@ -98,4 +98,4 @@ class FabricClient : public Fabric {
 		FabricClient() = default;
 };
 
-#endif /* NET_H */	
+#endif /* NET_HPP */	
