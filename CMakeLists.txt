@@ -1,20 +1,25 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.20)
 project(libfabric_practice)
 
 # === Find package configuration info. ===
 find_package(PkgConfig REQUIRED) # Ensure the 'pkg-config' binary is available.
 pkg_check_modules(LIBFABRIC REQUIRED libfabric) # (<prefix>, <arg>, <name>.pc)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libfabric_practice)
 
 # === Target executable. ===
 add_executable(libfabric_practice
-	#./libfabric_practice/main.cpp
+	#${SRC_DIR}/main.cpp
+	${SRC_DIR}/src/net.cpp
 )
 
 # === Include directories. ===
 target_include_directories(libfabric_practice
-	#./libfabric_practice/include
+	${SRC_DIR}/include
 	${LIBFABRIC_INCLUDE_DIRS}
 )
 
