@@ -12,6 +12,7 @@
 /* Sockets and socket-related libraries. */
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <print>
 
@@ -35,8 +36,8 @@ class Fabric {
 		/* Perform error checking for specific event queues. */
 		void check_eq_error(fid_eq* event_queue);
 
-		/* Point to the network config. structure. */
-		fi_info* fabric = nullptr;
+		/* Point towards the libfabric network configuration. */
+		fi_info* info = nullptr;
 
 		/* Point towards the network provider. */
 		fid_fabric* fabric = nullptr;
