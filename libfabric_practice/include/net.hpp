@@ -13,7 +13,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include <iostream>
+#include <print>
 
 /* Base class for fabric configurations, designed to be inherited. */
 class Fabric {
