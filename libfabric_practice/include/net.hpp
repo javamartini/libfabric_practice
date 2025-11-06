@@ -14,7 +14,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include <print>
+#include <cstdio>
+#include <cstdlib>
 
 /* Base class for fabric configurations, designed to be inherited. */
 class Fabric {

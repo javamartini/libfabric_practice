@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
-project(libfabric_practice)
+project(libfabric_practice CXX)
 
 # === Find package configuration info. ===
 find_package(PkgConfig REQUIRED) # Ensure the 'pkg-config' binary is available.
 pkg_check_modules(LIBFABRIC REQUIRED libfabric) # (<prefix>, <arg>, <name>.pc)
 find_package(Threads REQUIRED)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

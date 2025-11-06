@@ -1,8 +1,8 @@
 #include "net.hpp"
 
-#include <print>
+/* <cstdio> provided in net.hpp. */
 #include <unistd.h>
-#include <cstdlib>
+/* <cstdlib provided in net.hpp. */
 #include <thread>
 
 int main(int argc, char* argv[]) {
@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 				client.set_comm_mode(true);
 				break;
 			default:
-				std::print(stderr, "Error: unrecognized option\n");
+				std::fprintf(stderr, "Error: unrecognized option\n");
 				abort();
 		}
 	}

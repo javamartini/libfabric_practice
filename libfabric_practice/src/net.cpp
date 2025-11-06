@@ -120,7 +120,7 @@ int FabricServer::fabric_server(int port) {
 	check_libfabric(fi_getname(&passive_endpoint->fid, &addr, &addr_length),
 			"fi_getname()");
 
-	std::print("Server address: {}:{}\n", inet_ntoa(addr.sin_addr), 
+	std::printf("Server address: %s:%s\n", inet_ntoa(addr.sin_addr), 
 			ntohs(addr.sin_port));
 
 	/* A struct. for reporting connection management events in an event queue.
@@ -138,7 +138,7 @@ int FabricServer::fabric_server(int port) {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::print(stderr, "fi_eq_sread(): {}\n", 
+				std::fprintf(stderr, "fi_eq_sread(): %s\n", 
 						fi_strerror(-return_code));
 			}
 		}
@@ -182,7 +182,7 @@ int FabricServer::fabric_server(int port) {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::print(stderr, "fi_eq_sread(), FI_CONNECTED: {}\n",
+				std::fprintf(stderr, "fi_eq_sread(), FI_CONNECTED: %s\n",
 						fi_strerror(-return_code));
 			}
 		}
@@ -274,7 +274,8 @@ int FabricClient::fabric_client(const char* dest_addr, int dest_port) {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::print(stderr, "fi_eq_sread(), client, FI_CONNECTED: {}\n",
+				std::fprintf(stderr, 
+						"fi_eq_sread(), client, FI_CONNECTED: %s\n",
 						fi_strerror(-return_code));
 			}
 		}
@@ -311,7 +312,7 @@ void Fabric::check_libfabric(int code, const char* message) {
 		 * various functions (i.e. -FI_EADDRINUSE). However, fi_strerror
 		 * expects the actual error constant before it was inverted, so we must
 		 * pass it with '-'. */
-		std::print(stderr, "{}: {}\n", message, fi_strerror(-code));
+		std::fprintf(stderr, "%s: %s\n", message, fi_strerror(-code));
 		exit(EXIT_FAILURE);
 	}
 }
@@ -321,6 +322,6 @@ void Fabric::check_eq_error(fid_eq* event_queue) {
 	struct fi_eq_err_entry error_entry = {};
 	fi_eq_readerr(event_queue, &error_entry, 0); /* Read the EQ. */
 
-	std::print(stderr, "Event Queue Error: {}, Data Size: {}\n", 
+	std::fprintf(stderr, "Event Queue Error: %s, Data Size: %d\n", 
 			fi_strerror(error_entry.err), error_entry.err_data_size);
 }
