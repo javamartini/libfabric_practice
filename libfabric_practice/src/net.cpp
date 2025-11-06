@@ -1,7 +1,7 @@
 #include "net.hpp"
 
 /* Gather network information to configure the network. */
-int Fabric::fabric_init() {
+int Fabric::fabric_init(bool is_server) {
 	/* Create a structure that holds the libfabric config. that
 	 * is being requested. This structure will be used to request
 	 * an actual structure to begin making the network. */
@@ -18,8 +18,16 @@ int Fabric::fabric_init() {
 
 	/* Use the hinting structure to capture the real config.
 	 * for the network.*/
-	check_libfabric(fi_getinfo(FI_VERSION(1, 15), 0, 0, 0, hints, &info),
-			"fi_getinfo()");
+	if (is_server == true) {
+		const char* node = nullptr;
+		const char* service = "8080";
+
+		check_libfabric(fi_getinfo(FI_VERSION(1, 15), node, service, 
+					FI_SOURCE, hints, &info), "fi_getinfo()");
+	} else {
+		check_libfabric(fi_getinfo(FI_VERSION(1, 15), 0, 0, 0, hints, &info),
+				"fi_getinfo()");
+	}
 
 	/* Now that there is an actual config. from libfabric,
 	 * free the 'hints' info struct. */
@@ -29,7 +37,7 @@ int Fabric::fabric_init() {
 	 * available providers available to the OS. This represents
 	 * a collection of resources such as domains, event queues,
 	 * completion queues, endpoints, etc. */
-	check_libfabric(fi_fabric(info->fabric_attr, &fabric, 0),
+	check_libfabric(fi_fabric(info->fabric_attr, &fabric, nullptr),
 			"fi_fabric()");
 
 	/* Set event queue attributes. An event queue stores the 
@@ -91,7 +99,7 @@ int Fabric::fabric_finalize() {
 /* Initialize and listen on a libfabric server. */
 int FabricServer::fabric_server(int port) {
 	/* Initialize the network somewhat. */
-	fabric_init();
+	fabric_init(true);
 
 	/* Create a passive endpoint for the server. It will be used for listening 
 	 * for incoming connections. */
@@ -169,16 +177,31 @@ int FabricServer::fabric_server(int port) {
 	fi_eq_entry conn = {};
 	do {
 		int return_code = fi_eq_sread(event_queue, &event_type, &conn,
-				sizeof(fi_eq_entry), -1, 0);
+				sizeof(fi_eq_entry), 500, 0);
 		if (return_code < 0) {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::print("fi_eq_sread(), FI_CONNECTED: {}\n",
+				std::print(stderr, "fi_eq_sread(), FI_CONNECTED: {}\n",
 						fi_strerror(-return_code));
 			}
 		}
 	} while (event_type != FI_CONNECTED);
+
+	float send_buffer = 123.45;
+	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
+			"fi_send, conn_req, endpoint");
+
+	fi_cq_data_entry transmit_cq_entry = {};
+	int read = -1;
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	fi_cq_data_entry recv_cq_entry = {};
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
 
 	/* Now that we are done, release the conn. to the client. */
 	check_libfabric(fi_shutdown(endpoint, 0),
@@ -197,7 +220,7 @@ int FabricServer::fabric_server(int port) {
 /* Initialize and use a libfabric client. */
 int FabricClient::fabric_client(const char* dest_addr, int dest_port) {
 	/* Initialize the network somewhat. */
-	fabric_init();
+	fabric_init(false);
 
 	sockaddr_in dest = {};
 	dest.sin_family = AF_INET;
@@ -210,20 +233,25 @@ int FabricClient::fabric_client(const char* dest_addr, int dest_port) {
 
 	/* Create an endpoint that is responsible for initiating 
 	 * communication. */
-	check_libfabric(fi_endpoint(domain, info, &endpoint, 0),
+	check_libfabric(fi_endpoint(domain, info, &endpoint, nullptr),
 			"fi_endpoint(), client");
 
 	/* Open a receiving and transmission completion queue. */
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
-				&recv_queue, 0), "fi_cq_open(), recv_queue, client");
-	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
-				&transmit_queue, 0), "fi_cq_open(), transmit_queue, client");
+				&recv_queue, nullptr), "fi_cq_open(), recv_queue, client");
+	check_libfabric(fi_cq_open(domain, &completion_queue_attr, &transmit_queue,
+				nullptr), "fi_cq_open(), transmit_queue, client");
 
 	/* Bind and endpoint to both of the new completion queues. */
 	check_libfabric(fi_ep_bind(endpoint, &(recv_queue->fid), FI_RECV),
 			"fi_ep_bind, recv_queue, client");
 	check_libfabric(fi_ep_bind(endpoint, &(transmit_queue->fid), FI_TRANSMIT),
 			"fi_ep_bind, transmit_queue, client");
+
+	/* Bind the endpoint to the event queue and enable it. */
+	check_libfabric(fi_ep_bind(endpoint, &event_queue->fid, 0), 
+			"fi_ep_bind, event_queue, client");
+	check_libfabric(fi_enable(endpoint), "fi_enable, endpoint, client");
 
 	/* Communication is asynchronous for the most part in libfabric, so the 
 	 * provider only completes the operation when the matching work on
@@ -241,12 +269,12 @@ int FabricClient::fabric_client(const char* dest_addr, int dest_port) {
 	uint32_t event_type;
 	do {
 		int return_code = fi_eq_sread(event_queue, &event_type, &event,
-				sizeof(fi_eq_entry), -1, 0);
+				sizeof(fi_eq_entry), 500, 0);
 		if (return_code < 0) {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::print("fi_eq_sread(), client, FI_CONNECTED: {}\n",
+				std::print(stderr, "fi_eq_sread(), client, FI_CONNECTED: {}\n",
 						fi_strerror(-return_code));
 			}
 		}
@@ -256,6 +284,18 @@ int FabricClient::fabric_client(const char* dest_addr, int dest_port) {
 	float send_buffer = 678.90;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
 			"fi_send(), client)");
+
+	struct fi_cq_data_entry transmit_cq_entry = {};
+	int read = -1;
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+	/* check_libfabric(read); */
+
+	struct fi_cq_data_entry recv_cq_entry = {};
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
 
 	/* Gracefully shutdown the client. */
 	fabric_finalize();
@@ -281,6 +321,6 @@ void Fabric::check_eq_error(fid_eq* event_queue) {
 	struct fi_eq_err_entry error_entry = {};
 	fi_eq_readerr(event_queue, &error_entry, 0); /* Read the EQ. */
 
-	std::print("Event Queue Error: {}, Data Size: {}", 
+	std::print(stderr, "Event Queue Error: {}, Data Size: {}\n", 
 			fi_strerror(error_entry.err), error_entry.err_data_size);
 }

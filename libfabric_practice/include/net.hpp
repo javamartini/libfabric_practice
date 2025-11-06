@@ -20,7 +20,7 @@
 class Fabric {
 	public:
 		/* Gather networking information to configure the network. */
-		int fabric_init();
+		int fabric_init(bool is_server);
 
 		/* Gracefully shutdown the network. */
 		int fabric_finalize();
