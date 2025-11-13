@@ -3,7 +3,7 @@
 #include "debugger.hpp" /* Thank you Riley! :D */
 
 /* Initialize and listen as a libfabric server. */
-int server(int port) {
+int server() {
 
 	/* Create a structure that holds the libfabric config. that
 	 * is being requested. This structure will be used to request
@@ -19,7 +19,7 @@ int server(int port) {
 	/* Use the hinting structure to capture the real configuration
 	 * for the network. */
 	fi_info* info = nullptr;
-	check_libfabric(fi_getinfo(FI_VERSION(1, 15), nullptr, "8080", FI_SOURCE, 
+	check_libfabric(fi_getinfo(FI_VERSION(1, 15), 0, 0, 0,
 				hints, &info), "fi_getinfo()");
 
 	/* Now that there is an actual config. from libfabric,
