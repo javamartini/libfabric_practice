@@ -31,5 +31,5 @@ int main(int argc, char* argv[]) {
 
 	client(dest_addr.c_str(), dest_port);
 	
-	return 0;
+	return EXIT_SUCCESS;
 }
