@@ -6,13 +6,11 @@
 class Debugger
 {
 public:
-    void print_endpoint_address(long ep_rank, char *endpoint_address, fid_av *address_vector)
+    void print_endpoint_address(char *endpoint_address, fid_av *address_vector)
     {
         char *endpoint_address_string = new char[128];
         size_t ep_string_buff_len = 128;
-        std::cout << "Rank " << rank;
         std::cout << " has endpoint address " << fi_av_straddr(address_vector, endpoint_address, endpoint_address_string, &ep_string_buff_len);
-        std::cout << " for rank " << ep_rank << std::endl;
 
         delete[] endpoint_address_string;
     }
@@ -142,9 +140,6 @@ public:
 
     void print_info(fi_info *info)
     {
-        if (rank != 0)
-            return;
-
         if (!info)
         {
             std::cout << "fi_info is NULL!" << std::endl;
