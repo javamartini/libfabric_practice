@@ -75,6 +75,9 @@ int client(const char* dest_addr, int dest_port) {
 	check_libfabric(fi_endpoint(domain, info, &endpoint, nullptr),
 			"fi_endpoint(), client");
 
+	Debugger debug;
+	debug.print_info(info);
+
 	/* Open a receiving and transmission completion queue. */
 	fid_cq* transmit_queue = nullptr;
 	fid_cq* recv_queue = nullptr;
@@ -110,7 +113,7 @@ int client(const char* dest_addr, int dest_port) {
 	uint32_t event_type;
 	do {
 		int return_code = fi_eq_sread(event_queue, &event_type, &event,
-				sizeof(fi_eq_entry), 500, 0);
+				sizeof(fi_eq_entry), -1, 0);
 		if (return_code < 0) {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);

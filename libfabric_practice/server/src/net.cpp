@@ -81,6 +81,9 @@ int server() {
 	check_libfabric(fi_getname(&passive_endpoint->fid, &addr, &addr_length),
 			"fi_getname()");
 
+	Debugger debug;
+	debug.print_info(info);
+
 	std::cout << "Server address: " << inet_ntoa(addr.sin_addr) << ":" <<
 		ntohs(addr.sin_port) << std::endl;
 
@@ -115,15 +118,19 @@ int server() {
 	check_libfabric(fi_endpoint(domain, conn_req.info, &endpoint, 0),
 			"fi_domain(), server, conn_req");
 
-	/* Open a completion queue bound to the requestor's domain and endpoint. */
+	/* Open a receiving and tramsission completion queue bound to the 
+	 * requestor's domain and endpoint. */
+	fid_cq* recv_queue = nullptr;
+	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
+				&recv_queue, nullptr), "fi_cq_open(), recv_queue");
+	check_libfabric(fi_ep_bind(endpoint, &recv_queue->fid, FI_RECV),
+			"fi_ep_bind(). recv_queue");
+
 	fid_cq* transmit_queue = nullptr;
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
 				&transmit_queue, nullptr), "fi_cq_open(), server");
 	check_libfabric(fi_ep_bind(endpoint, &transmit_queue->fid, FI_TRANSMIT),
 			"fi_ep_bind(), server, transmit_queue");
-
-	/* TODO. It is entirely possible the same thing needs to happen with
-	 * recv_queue. */
 
 	/* Bind the new active endpoint to the event queue and enable it.*/
 	check_libfabric(fi_ep_bind(endpoint, &event_queue->fid, 0),
@@ -166,7 +173,6 @@ int server() {
 	} while (read == -FI_EAGAIN);
 
 	fi_cq_data_entry recv_cq_entry = {};
-	fid_cq* recv_queue = nullptr;
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
