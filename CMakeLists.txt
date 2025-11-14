@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.31)
 project(libfabric_practice CXX)
 
+# === Development-related arguments. ====
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # === Find package configuration info. ===
 find_package(PkgConfig REQUIRED) # Ensure the 'pkg-config' binary is available.
 pkg_check_modules(LIBFABRIC REQUIRED libfabric) # (<prefix>, <arg>, <name>.pc)
