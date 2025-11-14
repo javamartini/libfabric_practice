@@ -30,6 +30,7 @@ int server() {
 	 * available providers available to the OS. This represents
 	 * a collection of resources such as domains, event queues,
 	 * completion queues, endpoints, etc. */
+	fid_fabric* fabric;
 	check_libfabric(fi_fabric(info->fabric_attr, &fabric, nullptr),
 			"fi_fabric()");
 
@@ -48,7 +49,7 @@ int server() {
 			"fi_eq_open()");
 
 	/* Configure attributes of the completion queue. */
-	completion_queue_attr = {
+	fi_cq_attr completion_queue_attr = {
 		.flags = 0,
 
 		/* When completing operations, like 'fi_send' for instance, you
@@ -165,6 +166,7 @@ int server() {
 	} while (read == -FI_EAGAIN);
 
 	fi_cq_data_entry recv_cq_entry = {};
+	fid_cq* recv_queue = nullptr;
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);

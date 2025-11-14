@@ -14,6 +14,6 @@
 #include <netinet/in.h>
 
 /* Initialize and listen as a libfabric server. */
-int server(int port);
+int server();
 
 #endif /* NET_HPP */

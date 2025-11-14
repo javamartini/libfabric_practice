@@ -1,9 +1,9 @@
 #include "net.hpp"
 #include "err.hpp"
-#include "debugger.hpp"
+#include "debugger.hpp" /* Thanks again Riley! :D */
 
 /* Initialize and use a libfabric client. */
-int client(const char* dest_addr, int dest_addr) {
+int client(const char* dest_addr, int dest_port) {
 	/* Create a structure that holds the libfabric config. that
 	 * is being requested. This structure will be used to request
 	 * an actual structure to begin making the network. */
@@ -27,6 +27,7 @@ int client(const char* dest_addr, int dest_addr) {
 	 * available providers available to the OS. This represents
 	 * a collection of resources such as domains, event queues,
 	 * completion queues, endpoints, etc. */
+	fid_fabric* fabric = nullptr;
 	check_libfabric(fi_fabric(info->fabric_attr, &fabric, nullptr),
 			"fi_fabric()");
 
@@ -40,12 +41,12 @@ int client(const char* dest_addr, int dest_addr) {
 	};
 
 	/* Create the event queue using the settings structure. */
-	fi_eq* event_queue = nullptr;
+	fid_eq* event_queue = nullptr;
 	check_libfabric(fi_eq_open(fabric, &event_queue_attr, &event_queue, 0),
 			"fi_eq_open()");
 
 	/* Configure attributes of the completion queue. */
-	completion_queue_attr = {
+	fi_cq_attr completion_queue_attr = {
 		.flags = 0,
 
 		/* When completing operations, like 'fi_send' for instance, you
