@@ -1,2 +1,5 @@
 # Executable building directory.
 build/
+
+# Add Clangd cache directory.
+.cache/
