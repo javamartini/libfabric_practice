@@ -166,7 +166,7 @@ int server() {
 	 * asynchronous. */
 	float send_buffer = 123.45;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
-			"fi_send()");
+			"fi_send(), float");
 
 	/* We read the transmission completion queue, and it will let us know when
 	 * the message has been transmitted. This essentially turns an asynchronous
@@ -185,6 +185,48 @@ int server() {
 	} while (read == -FI_EAGAIN);
 
 	std::cout << std::endl << "Data received: " << recv_buffer << std::endl;
+
+	/* A little more practice. First, we are gonna send the size of our array,
+	 * then receive the size of the clients array. Then, we are gonna send the 
+	 * array itself, and vice versa for the client. */	
+	size_t send_msg_size = 50;
+	check_libfabric(fi_send(endpoint, &send_msg_size, sizeof(size_t), 0, 0, 0),
+			"fi_send(), array_size");
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	size_t recv_msg_size = 0;
+	check_libfabric(fi_recv(endpoint, &recv_msg_size, sizeof(size_t), 0, 0, 0),
+			"fi_recv(), array_size");
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::cout << std::endl << "Array size received: " << recv_msg_size << 
+		std::endl;
+
+	std::vector<float> send_arr_buf(50);
+	std::fill(send_arr_buf.begin(), send_arr_buf.end(), 25.2);
+
+	check_libfabric(fi_send(endpoint, send_arr_buf.data(), send_arr_buf.size(),
+				0, 0, 0), "fi_send(), array");
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::vector<float> recv_arr_buf(recv_msg_size);
+	check_libfabric(fi_recv(endpoint, recv_arr_buf.data(), 
+				recv_arr_buf.size() * sizeof(float),
+				0, 0, 0), "fi_recv(), array");
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::cout << "Array: ";
+	for (auto i : recv_arr_buf)
+		std::cout << i << " ";
+	std::cout << std::endl;
 
 	/* Now that we are done, release the conn. to the client. */
 	check_libfabric(fi_shutdown(endpoint, 0),

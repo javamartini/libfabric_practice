@@ -13,6 +13,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <vector>
+
 /* Initialize and listen as a libfabric server. */
 int server();
 

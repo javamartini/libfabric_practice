@@ -13,6 +13,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <vector>
+
 /* Initialize and use a libfabric client. */
 int client(const char* dest_addr, int dest_port);
 

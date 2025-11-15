@@ -150,6 +150,47 @@ int client(const char* dest_addr, int dest_port) {
 
 	std::cout << std::endl << "Data received: " << recv_buffer << std::endl;
 
+	/* A little more practice. We are gonna send and receive a couple
+	 * arrays. */
+	size_t send_msg_size = 70;
+	check_libfabric(fi_send(endpoint, &send_msg_size, sizeof(size_t), 0, 0, 0),
+			"fi_send(), array_size");
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	size_t recv_msg_size = 0;
+	check_libfabric(fi_recv(endpoint, &recv_msg_size, sizeof(size_t), 0, 0, 0),
+			"fi_recv(), array_size");
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::cout << std::endl << "Array size received: " << recv_msg_size <<
+		std::endl;
+
+	std::vector<float> send_arr_buf(70);
+	std::fill(send_arr_buf.begin(), send_arr_buf.end(), 35.6);
+
+	check_libfabric(fi_send(endpoint, send_arr_buf.data(), send_arr_buf.size(),
+				0, 0, 0), "fi_send(), array");
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::vector<float> recv_arr_buf(recv_msg_size);
+	check_libfabric(fi_recv(endpoint, recv_arr_buf.data(),
+				recv_arr_buf.size() * sizeof(float),
+				0, 0, 0), "fi_recv(), array");
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::cout << "Array: ";
+	for (auto i : recv_arr_buf)
+		std::cout << i << " ";
+	std::cout << std::endl;
+
 	/* Endpoints must be closed before any objects bound to them can be. */
 	check_libfabric(fi_close(&endpoint->fid),
 			"fi_close(), endpoint");
