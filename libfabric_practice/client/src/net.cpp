@@ -67,13 +67,13 @@ int client(const char* dest_addr, int dest_port) {
 	/* Create a domain for endpoints to be created on top of. */
 	fid_domain* domain = nullptr;
 	check_libfabric(fi_domain(fabric, info, &domain, 0),
-			"fi_domain(), client");
+			"fi_domain()");
 
 	/* Create an endpoint that is responsible for initiating
 	 * communication. */
 	fid_ep* endpoint = nullptr;
 	check_libfabric(fi_endpoint(domain, info, &endpoint, nullptr),
-			"fi_endpoint(), client");
+			"fi_endpoint()");
 
 	Debugger debug;
 	debug.print_info(info);
@@ -82,30 +82,30 @@ int client(const char* dest_addr, int dest_port) {
 	fid_cq* transmit_queue = nullptr;
 	fid_cq* recv_queue = nullptr;
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
-				&recv_queue, nullptr), "fi_cq_open(), recv_queue, client");
+				&recv_queue, nullptr), "fi_cq_open(), recv_queue");
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr, &transmit_queue,
-				nullptr), "fi_cq_open(), transmit_queue, client");
+				nullptr), "fi_cq_open(), transmit_queue");
 
 	/* Bind and endpoint to both of the new completion queues. */
 	check_libfabric(fi_ep_bind(endpoint, &(recv_queue->fid), FI_RECV),
-			"fi_ep_bind, recv_queue, client");
+			"fi_ep_bind(), recv_queue");
 	check_libfabric(fi_ep_bind(endpoint, &(transmit_queue->fid), FI_TRANSMIT),
-			"fi_ep_bind, transmit_queue, client");
+			"fi_ep_bind(), transmit_queue");
 
 	/* Bind the endpoint to the event queue and enable it. */
 	check_libfabric(fi_ep_bind(endpoint, &event_queue->fid, 0),
-			"fi_ep_bind, event_queue, client");
-	check_libfabric(fi_enable(endpoint), "fi_enable, endpoint, client");
+			"fi_ep_bind(), event_queue");
+	check_libfabric(fi_enable(endpoint), "fi_enable()");
 
 	/* Communication is asynchronous for the most part in libfabric, so the
 	 * provider only completes the operation when the matching work on
 	 * the other size actually exists. */
 	float recv_buffer = 0.0;
 	check_libfabric(fi_recv(endpoint, &recv_buffer, sizeof(float), 0, 0, 0),
-			"fi_recv(), client");
+			"fi_recv()");
 
 	/* Send the server the connection request. */
-	check_libfabric(fi_connect(endpoint, &dest, 0, 0), "fi_connect(), client");
+	check_libfabric(fi_connect(endpoint, &dest, 0, 0), "fi_connect()");
 
 	/* Use the active endpoint to post a "FI_CONNECTED" event into the
 	 * event queue. */
@@ -119,7 +119,7 @@ int client(const char* dest_addr, int dest_port) {
 				check_eq_error(event_queue);
 			} else {
 				std::fprintf(stderr,
-						"fi_eq_sread(), client, FI_CONNECTED: %s\n",
+						"fi_eq_sread(), FI_CONNECTED: %s\n",
 						fi_strerror(-return_code));
 			}
 		}
@@ -129,7 +129,7 @@ int client(const char* dest_addr, int dest_port) {
 	 * asynchronous call. We are just sending a floating point number here. */
 	float send_buffer = 678.90;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
-			"fi_send(), client)");
+			"fi_send()");
 
 	/* We read the transmission completion queue, and it will let us know when
 	 * the message has been transmitted. This essentially turns an asynchronous

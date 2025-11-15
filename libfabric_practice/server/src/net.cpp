@@ -102,7 +102,7 @@ int server() {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::fprintf(stderr, "fi_eq_sread(): %s\n",
+				std::fprintf(stderr, "fi_eq_sread(), FI_CONNREQ: %s\n",
 						fi_strerror(-return_code));
 			}
 		}
@@ -111,12 +111,12 @@ int server() {
 	/* Create a domain for the client based off of their provider info. */
 	fid_domain* domain = nullptr;
 	check_libfabric(fi_domain(fabric, conn_req.info, &domain, 0),
-			"fi_domain(), server, conn_req");
+			"fi_domain()");
 
 	/* Create an endpoint for the client using their provider info. */
 	fid_ep* endpoint = nullptr;
 	check_libfabric(fi_endpoint(domain, conn_req.info, &endpoint, 0),
-			"fi_domain(), server, conn_req");
+			"fi_endpoint()");
 
 	/* Open a receiving and tramsission completion queue bound to the 
 	 * requestor's domain and endpoint. */
@@ -124,27 +124,27 @@ int server() {
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
 				&recv_queue, nullptr), "fi_cq_open(), recv_queue");
 	check_libfabric(fi_ep_bind(endpoint, &recv_queue->fid, FI_RECV),
-			"fi_ep_bind(). recv_queue");
+			"fi_ep_bind(), recv_queue");
 
 	fid_cq* transmit_queue = nullptr;
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
-				&transmit_queue, nullptr), "fi_cq_open(), server");
+				&transmit_queue, nullptr), "fi_cq_open(), transmit_queue");
 	check_libfabric(fi_ep_bind(endpoint, &transmit_queue->fid, FI_TRANSMIT),
-			"fi_ep_bind(), server, transmit_queue");
+			"fi_ep_bind(), transmit_queue");
 
 	/* Bind the new active endpoint to the event queue and enable it.*/
 	check_libfabric(fi_ep_bind(endpoint, &event_queue->fid, 0),
-			"fi_ep_bind(), conn_req endpoint, event_queue");
-	check_libfabric(fi_enable(endpoint), "fi_enable(), conn_req, endpoint");
+			"fi_ep_bind(), event_queue");
+	check_libfabric(fi_enable(endpoint), "fi_enable()");
 
 	/* This is asynchronous, so post a receive buffer so when data is sent,
 	 * there is a place for it to go. */
 	float recv_buffer = 0.0;
 	check_libfabric(fi_recv(endpoint, &recv_buffer, sizeof(float), 0, 0, 0),
-			"fi_recv(), conn_req");
+			"fi_recv()");
 
 	/* Send an acceptance response back to the requestor. */
-	check_libfabric(fi_accept(endpoint, 0, 0), "fi_accept, conn_req");
+	check_libfabric(fi_accept(endpoint, 0, 0), "fi_accept");
 
 	/* Use the actice endpoint (the connection requestor) to post an
 	 * 'FI_CONNECTED' event into the event queue. */
@@ -166,7 +166,7 @@ int server() {
 	 * asynchronous. */
 	float send_buffer = 123.45;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
-			"fi_send, conn_req, endpoint");
+			"fi_send()");
 
 	/* We read the transmission completion queue, and it will let us know when
 	 * the message has been transmitted. This essentially turns an asynchronous
@@ -189,7 +189,7 @@ int server() {
 
 	/* Now that we are done, release the conn. to the client. */
 	check_libfabric(fi_shutdown(endpoint, 0),
-			"fi_shutdown(), server, conn_req");
+			"fi_shutdown(), endpoint");
 
 	/* Close the passive endpoint. */
 	check_libfabric(fi_close(&passive_endpoint->fid),
