@@ -1,7 +1,8 @@
 #include "net.hpp"
+#include <cstdlib>
 
 int main() {
 	server();
 
-	return 0;
+	return EXIT_SUCCESS;
 }
