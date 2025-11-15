@@ -125,11 +125,15 @@ int client(const char* dest_addr, int dest_port) {
 		}
 	} while (event_type != FI_CONNECTED);
 
-	/* Post a send buffer to the endpoint. At this point, we are connected. */
+	/* Post a send buffer and send it to the now-connected server. This is an
+	 * asynchronous call. We are just sending a floating point number here. */
 	float send_buffer = 678.90;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
 			"fi_send(), client)");
 
+	/* We read the transmission completion queue, and it will let us know when
+	 * the message has been transmitted. This essentially turns an asynchronous
+	 * call and make it synchronous. */
 	struct fi_cq_data_entry transmit_cq_entry = {};
 	int read = -1;
 	do {
@@ -137,6 +141,10 @@ int client(const char* dest_addr, int dest_port) {
 	} while (read == -FI_EAGAIN);
 	/* check_libfabric(read); */
 
+	/* We read the receiving completion queue, and it will let us know when
+	 * a message has been received. Even though we do not explicitely ask to
+	 * grab that data by using fi_recv(), we do get the data from the connected
+	 * server. So, there is still an entry in the completion queue. */
 	struct fi_cq_data_entry recv_cq_entry = {};
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);

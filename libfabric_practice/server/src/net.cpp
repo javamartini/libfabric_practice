@@ -162,16 +162,26 @@ int server() {
 		}
 	} while (event_type != FI_CONNECTED);
 
+	/* Send a floating point number. Remember, these calls are primarily
+	 * asynchronous. */
 	float send_buffer = 123.45;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
 			"fi_send, conn_req, endpoint");
 
+	/* We read the transmission completion queue, and it will let us know when
+	 * the message has been transmitted. This essentially turns an asynchronous
+	 * call and makes it synchronous. */
 	fi_cq_data_entry transmit_cq_entry = {};
 	int read = -1;
 	do {
 		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
 
+	/* We read the receiving completion queue, and it will let us know when
+	 * a message has been received. Even though we do not explicitly ask to
+	 * grab that data by using fi_recv(), we do get received data from the
+	 * connected client. So, there is still an entry in the completion 
+	 * queue. */
 	fi_cq_data_entry recv_cq_entry = {};
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
