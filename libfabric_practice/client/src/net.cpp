@@ -142,13 +142,13 @@ int client(const char* dest_addr, int dest_port) {
 	/* check_libfabric(read); */
 
 	/* We read the receiving completion queue, and it will let us know when
-	 * a message has been received. Even though we do not explicitely ask to
-	 * grab that data by using fi_recv(), we do get the data from the connected
-	 * server. So, there is still an entry in the completion queue. */
+	 * a message has been received. We have posted a receive buffer already. */
 	struct fi_cq_data_entry recv_cq_entry = {};
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
+
+	std::cout << std::endl << "Data received: " << recv_buffer << std::endl;
 
 	/* Endpoints must be closed before any objects bound to them can be. */
 	check_libfabric(fi_close(&endpoint->fid),
