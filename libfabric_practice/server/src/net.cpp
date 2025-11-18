@@ -209,16 +209,67 @@ int server() {
 	std::vector<float> send_arr_buf(50);
 	std::fill(send_arr_buf.begin(), send_arr_buf.end(), 25.2);
 
-	check_libfabric(fi_send(endpoint, send_arr_buf.data(), send_arr_buf.size(),
-				0, 0, 0), "fi_send(), array");
+	/* Arrays can't always be sent in one go, so we are going to keep sending
+	 * it until it is all sent, indicating by tracking the remaining amount. */
+	ssize_t total_buf_size = send_arr_buf.size() * sizeof(float);
+	size_t remaining_send = total_buf_size;
+	ssize_t sent = 0;
+	ssize_t total_sent = 0;
+	char* current_buf = reinterpret_cast<char*>(send_arr_buf.data());
+	while (total_sent < total_buf_size) {
+		/* So, fi_send() will return zero if the whole buffer was able to be
+		 * sent. If it was a partial send though, it will return the amount of
+		 * bytes sent. So we want to advance the buffer by the amount of bytes
+		 * sent so we can track what to send next. A char* data type is the
+		 * smallest one we can use, as it has just a size of 1 byte. We will
+		 * use this to track our buffer. */
+		sent = fi_send(endpoint, current_buf, remaining_send, 0, 0, 0);
+
+		if (sent > 0) {
+			total_sent += sent;
+			remaining_send -= sent;
+			current_buf += sent;
+		} else if (sent == 0) {
+			total_sent += remaining_send;
+			remaining_send = 0;
+		} else if (sent == -FI_EAGAIN) {
+			/* We will check the value 'read' after the loop finished. */
+			read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+		} else if (sent < 0) {
+			break;
+		}
+	}
+
+	std::cout << "ebug" << std::endl;
+
+	/* Poll one last time to make sure the sending is complete. */
 	do {
 		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
 
+	const size_t expected_buf_size = recv_msg_size;
+	const size_t expected_buf_bytes = expected_buf_size * sizeof(float);
 	std::vector<float> recv_arr_buf(recv_msg_size);
-	check_libfabric(fi_recv(endpoint, recv_arr_buf.data(), 
-				recv_arr_buf.size() * sizeof(float),
-				0, 0, 0), "fi_recv(), array");
+
+	current_buf = reinterpret_cast<char*>(recv_arr_buf.data());
+	size_t remaining_recv = expected_buf_bytes;
+	size_t recv = 0;
+	size_t total_recv = 0;
+	while (total_recv < expected_buf_bytes) {
+		recv = fi_recv(endpoint, current_buf, remaining_recv, 0, 0, 0);
+
+		if (recv > 0) {
+			total_recv += recv;
+			remaining_recv -= recv;
+			current_buf += recv;
+		} else if (recv == -FI_EAGAIN) {
+			read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+		} else if (recv < 0) {
+			break;
+		}
+	}
+	
+	/* Poll one last time to make sure the recv is complete. */
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
