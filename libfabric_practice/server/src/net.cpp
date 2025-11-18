@@ -102,7 +102,7 @@ int server() {
 			if (-FI_EAVAIL == return_code) {
 				check_eq_error(event_queue);
 			} else {
-				std::fprintf(stderr, "fi_eq_sread(): %s\n",
+				std::fprintf(stderr, "fi_eq_sread(), FI_CONNREQ: %s\n",
 						fi_strerror(-return_code));
 			}
 		}
@@ -111,12 +111,12 @@ int server() {
 	/* Create a domain for the client based off of their provider info. */
 	fid_domain* domain = nullptr;
 	check_libfabric(fi_domain(fabric, conn_req.info, &domain, 0),
-			"fi_domain(), server, conn_req");
+			"fi_domain()");
 
 	/* Create an endpoint for the client using their provider info. */
 	fid_ep* endpoint = nullptr;
 	check_libfabric(fi_endpoint(domain, conn_req.info, &endpoint, 0),
-			"fi_domain(), server, conn_req");
+			"fi_endpoint()");
 
 	/* Open a receiving and tramsission completion queue bound to the 
 	 * requestor's domain and endpoint. */
@@ -124,27 +124,27 @@ int server() {
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
 				&recv_queue, nullptr), "fi_cq_open(), recv_queue");
 	check_libfabric(fi_ep_bind(endpoint, &recv_queue->fid, FI_RECV),
-			"fi_ep_bind(). recv_queue");
+			"fi_ep_bind(), recv_queue");
 
 	fid_cq* transmit_queue = nullptr;
 	check_libfabric(fi_cq_open(domain, &completion_queue_attr,
-				&transmit_queue, nullptr), "fi_cq_open(), server");
+				&transmit_queue, nullptr), "fi_cq_open(), transmit_queue");
 	check_libfabric(fi_ep_bind(endpoint, &transmit_queue->fid, FI_TRANSMIT),
-			"fi_ep_bind(), server, transmit_queue");
+			"fi_ep_bind(), transmit_queue");
 
 	/* Bind the new active endpoint to the event queue and enable it.*/
 	check_libfabric(fi_ep_bind(endpoint, &event_queue->fid, 0),
-			"fi_ep_bind(), conn_req endpoint, event_queue");
-	check_libfabric(fi_enable(endpoint), "fi_enable(), conn_req, endpoint");
+			"fi_ep_bind(), event_queue");
+	check_libfabric(fi_enable(endpoint), "fi_enable()");
 
 	/* This is asynchronous, so post a receive buffer so when data is sent,
 	 * there is a place for it to go. */
 	float recv_buffer = 0.0;
 	check_libfabric(fi_recv(endpoint, &recv_buffer, sizeof(float), 0, 0, 0),
-			"fi_recv(), conn_req");
+			"fi_recv()");
 
 	/* Send an acceptance response back to the requestor. */
-	check_libfabric(fi_accept(endpoint, 0, 0), "fi_accept, conn_req");
+	check_libfabric(fi_accept(endpoint, 0, 0), "fi_accept");
 
 	/* Use the actice endpoint (the connection requestor) to post an
 	 * 'FI_CONNECTED' event into the event queue. */
@@ -162,24 +162,126 @@ int server() {
 		}
 	} while (event_type != FI_CONNECTED);
 
+	/* Send a floating point number. Remember, these calls are primarily
+	 * asynchronous. */
 	float send_buffer = 123.45;
 	check_libfabric(fi_send(endpoint, &send_buffer, sizeof(float), 0, 0, 0),
-			"fi_send, conn_req, endpoint");
+			"fi_send(), float");
 
+	/* We read the transmission completion queue, and it will let us know when
+	 * the message has been transmitted. This essentially turns an asynchronous
+	 * call and makes it synchronous. */
 	fi_cq_data_entry transmit_cq_entry = {};
 	int read = -1;
 	do {
 		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
 
+	/* We read the receiving completion queue, and it will let us know when
+	 * a message has been received. We have posted a receive buffer already. */
 	fi_cq_data_entry recv_cq_entry = {};
 	do {
 		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
 	} while (read == -FI_EAGAIN);
 
+	std::cout << std::endl << "Data received: " << recv_buffer << std::endl;
+
+	/* A little more practice. First, we are gonna send the size of our array,
+	 * then receive the size of the clients array. Then, we are gonna send the 
+	 * array itself, and vice versa for the client. */	
+	size_t send_msg_size = 50;
+	check_libfabric(fi_send(endpoint, &send_msg_size, sizeof(size_t), 0, 0, 0),
+			"fi_send(), array_size");
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	size_t recv_msg_size = 0;
+	check_libfabric(fi_recv(endpoint, &recv_msg_size, sizeof(size_t), 0, 0, 0),
+			"fi_recv(), array_size");
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::cout << std::endl << "Array size received: " << recv_msg_size << 
+		std::endl;
+
+	std::vector<float> send_arr_buf(50);
+	std::fill(send_arr_buf.begin(), send_arr_buf.end(), 25.2);
+
+	/* Arrays can't always be sent in one go, so we are going to keep sending
+	 * it until it is all sent, indicating by tracking the remaining amount. */
+	ssize_t total_buf_size = send_arr_buf.size() * sizeof(float);
+	size_t remaining_send = total_buf_size;
+	ssize_t sent = 0;
+	ssize_t total_sent = 0;
+	char* current_buf = reinterpret_cast<char*>(send_arr_buf.data());
+	while (total_sent < total_buf_size) {
+		/* So, fi_send() will return zero if the whole buffer was able to be
+		 * sent. If it was a partial send though, it will return the amount of
+		 * bytes sent. So we want to advance the buffer by the amount of bytes
+		 * sent so we can track what to send next. A char* data type is the
+		 * smallest one we can use, as it has just a size of 1 byte. We will
+		 * use this to track our buffer. */
+		sent = fi_send(endpoint, current_buf, remaining_send, 0, 0, 0);
+
+		if (sent > 0) {
+			total_sent += sent;
+			remaining_send -= sent;
+			current_buf += sent;
+		} else if (sent == 0) {
+			total_sent += remaining_send;
+			remaining_send = 0;
+		} else if (sent == -FI_EAGAIN) {
+			/* We will check the value 'read' after the loop finished. */
+			read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+		} else if (sent < 0) {
+			break;
+		}
+	}
+
+	std::cout << "ebug" << std::endl;
+
+	/* Poll one last time to make sure the sending is complete. */
+	do {
+		read = fi_cq_sread(transmit_queue, &transmit_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	const size_t expected_buf_size = recv_msg_size;
+	const size_t expected_buf_bytes = expected_buf_size * sizeof(float);
+	std::vector<float> recv_arr_buf(recv_msg_size);
+
+	current_buf = reinterpret_cast<char*>(recv_arr_buf.data());
+	size_t remaining_recv = expected_buf_bytes;
+	size_t recv = 0;
+	size_t total_recv = 0;
+	while (total_recv < expected_buf_bytes) {
+		recv = fi_recv(endpoint, current_buf, remaining_recv, 0, 0, 0);
+
+		if (recv > 0) {
+			total_recv += recv;
+			remaining_recv -= recv;
+			current_buf += recv;
+		} else if (recv == -FI_EAGAIN) {
+			read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+		} else if (recv < 0) {
+			break;
+		}
+	}
+	
+	/* Poll one last time to make sure the recv is complete. */
+	do {
+		read = fi_cq_sread(recv_queue, &recv_cq_entry, 1, 0, -1);
+	} while (read == -FI_EAGAIN);
+
+	std::cout << "Array: ";
+	for (auto i : recv_arr_buf)
+		std::cout << i << " ";
+	std::cout << std::endl;
+
 	/* Now that we are done, release the conn. to the client. */
 	check_libfabric(fi_shutdown(endpoint, 0),
-			"fi_shutdown(), server, conn_req");
+			"fi_shutdown(), endpoint");
 
 	/* Close the passive endpoint. */
 	check_libfabric(fi_close(&passive_endpoint->fid),

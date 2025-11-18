@@ -7,7 +7,7 @@
 
 int main(int argc, char* argv[]) {
 	std::string dest_addr = "127.0.0.1";
-	int dest_port = 8080;
+	int dest_port = -1;
 
 	/* Parse CLI arguments. */
 	int opt = -1;
@@ -27,6 +27,11 @@ int main(int argc, char* argv[]) {
 
 				return EXIT_FAILURE;
 		}
+	}
+
+	if (dest_port == -1) {
+		std::cerr << "[ERROR] Port number was never specified." << std::endl;
+		return EXIT_FAILURE;
 	}
 
 	client(dest_addr.c_str(), dest_port);

@@ -8,7 +8,18 @@ if we get to implementing it alongside OpenMPI, then we can.
 
 ## Usage
 
-There isn't one yet. XD
+Usage is simple. The only application with any usage instructions is the 
+client. 
+
+### Client Binary
+
+The application is controlled with arguments. 
+
+- `-a [DEST_ADDRESS]`: Specify the destination IPv4 address to attempt a
+connection with. The default address is `127.0.0.1`.
+
+- `-p [DEST_PORT]`: Specify the destination port number to attempt a
+connection with. There is no default port number.
 
 ## Installation
 
